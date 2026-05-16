@@ -114,12 +114,14 @@ class ScanBody(BaseModel):
     source: str = Field(..., description="数据源插件名，如 v2ex")
     keywords: Optional[list[str]] = None
     max_items: Optional[int] = Field(default=None, ge=1, le=500)
+    language: str = Field(default="zh", pattern="^(zh|en)$", description="Output language: zh or en")
 
 
 class IngestBody(BaseModel):
     source_name: str
     content_list: list[str] = Field(..., min_length=1, max_length=100)
     keywords: Optional[list[str]] = None
+    language: str = Field(default="zh", pattern="^(zh|en)$", description="Output language: zh or en")
 
 
 @app.on_event("startup")
@@ -178,12 +180,15 @@ def post_scan(
             def emit(e: dict) -> None:
                 event_bus.push(task_id, e)
 
+            # 按请求语言覆盖 settings（不影响全局单例）
+            req_settings = settings.model_copy(update={"output_language": body.language})
+
             stats = run_pipeline(
                 source=body.source,
                 mode="daily_report",
                 max_items=body.max_items,
                 keywords=body.keywords,
-                settings=settings,
+                settings=req_settings,
                 db=ldb,
                 output_dir=settings.output_dir,
                 on_progress=prog,
@@ -367,11 +372,12 @@ def post_ingest(
         ldb = SqliteManager(settings.ideahunter_sqlite_path)
         try:
             ldb.update_task(task_id, status="processing", progress="Ingesting…")
+            req_settings = settings.model_copy(update={"output_language": body.language})
             stats = run_ingested_contents(
                 source_name=body.source_name,
                 content_list=body.content_list,
                 keywords=body.keywords,
-                settings=settings,
+                settings=req_settings,
                 db=ldb,
                 output_dir=settings.output_dir,
                 on_progress=lambda m: ldb.update_task(task_id, progress=m),

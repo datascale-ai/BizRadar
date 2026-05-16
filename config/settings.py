@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     hot_mode_enabled: bool = False
     hn_hot_min_points: int = 30
 
+    # ── 输出语言 ──
+    output_language: str = "zh"  # "zh" = 中文, "en" = English
+
 
 @lru_cache
 def get_settings() -> Settings:

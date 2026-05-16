@@ -357,6 +357,13 @@
             <label>关键词过滤（逗号分隔）</label>
             <input type="text" class="input" id="scan-keywords" placeholder="效率工具, 太难用" />
           </div>
+          <div class="form-group">
+            <label>输出语言 / Output Language</label>
+            <select class="input" id="scan-language">
+              <option value="zh">🇨🇳 中文（默认）</option>
+              <option value="en">🇺🇸 English</option>
+            </select>
+          </div>
         </div>
         <button class="btn btn-primary" id="btn-scan" onclick="submitScan()">🚀 启动扫描任务</button>
       </div>
@@ -371,6 +378,13 @@
           <div class="form-group">
             <label>关键词过滤（可选）</label>
             <input type="text" class="input" id="ingest-keywords" placeholder="乱码, 导出" />
+          </div>
+          <div class="form-group">
+            <label>输出语言 / Output Language</label>
+            <select class="input" id="ingest-language">
+              <option value="zh">🇨🇳 中文（默认）</option>
+              <option value="en">🇺🇸 English</option>
+            </select>
           </div>
         </div>
         <div class="form-group" style="margin-bottom:16px">
@@ -741,6 +755,18 @@ function generateShareCard() {
   const LX=32, LW=472, RX=524, RW=W-RX-28;
   let ly=bodyTop+20, ry=bodyTop+20;
 
+  // Language detection for labels
+  const isEn = idea.markdown_prd && idea.markdown_prd.includes('Business Opportunity Scorecard');
+  const L_PAIN = isEn ? '⚡ Core Pain Point' : '⚡ 核心痛点';
+  const L_PRICE = isEn ? '💰 Monetization' : '💰 变现方向';
+  const L_GROWTH = isEn ? '🚀 Cold Start Strategy' : '🚀 冷启动策略';
+  const L_FEAT = isEn ? '🚀 Core Features' : '🚀 核心功能';
+  const L_SCORE = isEn ? '📊 Business Score' : '📊 商业评分';
+  const L_SCORE_UNIT = isEn ? ' pts' : '分';
+  const L_STACK = isEn ? '🔧 Tech Stack' : '🔧 技术栈';
+  const L_COMP = isEn ? '🏁 Competitor Analysis' : '🏁 竞品分析';
+  const L_FOOTER = isEn ? 'BizRadar Indie Hacker Growth Engine' : 'BizRadar 独立开发者增长引擎';
+
   // ── LEFT: Insight quote ──
   const insight=idea.user_story||idea.summary||extractSection(idea.markdown_prd,'痛点')||extractSection(idea.markdown_prd,'pain')||'';
   if(insight){
@@ -753,7 +779,7 @@ function generateShareCard() {
 
   // ── LEFT: Pain bullets ──
   ctx.font='bold 11px Inter,sans-serif'; ctx.fillStyle='rgba(240,96,128,0.85)';
-  ctx.fillText('⚡ 核心痛点',LX,ly); ly+=18;
+  ctx.fillText(L_PAIN,LX,ly); ly+=18;
   const pains=extractBullets(idea.markdown_prd,['痛点溯源','痛点','Pain'],3);
   ctx.font='13px Inter,sans-serif';
   pains.forEach((pt)=>{
@@ -765,20 +791,20 @@ function generateShareCard() {
   if(pains.length) ly+=6;
 
   // ── LEFT: Pricing hint ──
-  const pricing=extractSection(idea.markdown_prd,'定价')||extractSection(idea.markdown_prd,'收费')||'';
+  const pricing=extractSection(idea.markdown_prd,'定价')||extractSection(idea.markdown_prd,'收费')||extractSection(idea.markdown_prd,'Pricing')||'';
   if(pricing){
     ctx.font='bold 11px Inter,sans-serif'; ctx.fillStyle='rgba(246,201,14,0.85)';
-    ctx.fillText('💰 变现方向',LX,ly); ly+=17;
+    ctx.fillText(L_PRICE,LX,ly); ly+=17;
     ctx.font='12px Inter,sans-serif'; ctx.fillStyle='rgba(226,232,247,0.58)';
     wrapText(ctx,pricing.slice(0,72)+(pricing.length>72?'…':''),LX+6,ly,LW-16,18);
     ly+=26;
   }
 
   // ── LEFT: Cold-start hint ──
-  const coldstart=extractSection(idea.markdown_prd,'冷启动')||extractSection(idea.markdown_prd,'获客')||'';
+  const coldstart=extractSection(idea.markdown_prd,'冷启动')||extractSection(idea.markdown_prd,'获客')||extractSection(idea.markdown_prd,'Cold-Start')||'';
   if(coldstart && ly < H-100){
     ctx.font='bold 11px Inter,sans-serif'; ctx.fillStyle='rgba(34,211,165,0.85)';
-    ctx.fillText('🚀 冷启动策略',LX,ly); ly+=17;
+    ctx.fillText(L_GROWTH,LX,ly); ly+=17;
     ctx.font='12px Inter,sans-serif'; ctx.fillStyle='rgba(226,232,247,0.55)';
     wrapText(ctx,coldstart.slice(0,72)+(coldstart.length>72?'…':''),LX+6,ly,LW-16,18);
   }
@@ -790,7 +816,7 @@ function generateShareCard() {
 
   // ── RIGHT: Core features ──
   ctx.font='bold 11px Inter,sans-serif'; ctx.fillStyle='rgba(79,156,249,0.88)';
-  ctx.fillText('🚀 核心功能',RX,ry); ry+=18;
+  ctx.fillText(L_FEAT,RX,ry); ry+=18;
   const feats=extractBullets(idea.markdown_prd,['产品定义','核心功能','核心三功能','功能','Feature'],4);
   feats.forEach((f,i)=>{
     const fh=28;
@@ -804,19 +830,19 @@ function generateShareCard() {
 
   // ── RIGHT: Score meter ──
   ctx.font='bold 11px Inter,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.38)';
-  ctx.fillText('📊 商业评分',RX,ry); ry+=15;
+  ctx.fillText(L_SCORE,RX,ry); ry+=15;
   ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.beginPath(); ctx.roundRect(RX,ry,RW,10,5); ctx.fill();
   const mg=ctx.createLinearGradient(RX,0,RX+RW,0);
   mg.addColorStop(0,'#4f9cf9'); mg.addColorStop(0.6,'#7c3aed'); mg.addColorStop(1,'#22d3a5');
   ctx.fillStyle=mg; ctx.beginPath(); ctx.roundRect(RX,ry,Math.round(RW*idea.score/100),10,5); ctx.fill();
   ctx.fillStyle=sc; ctx.font='bold 11px "JetBrains Mono",monospace'; ctx.textAlign='right';
-  ctx.fillText(idea.score+'分',RX+RW,ry+22); ctx.textAlign='left';
+  ctx.fillText(idea.score+L_SCORE_UNIT,RX+RW,ry+22); ctx.textAlign='left';
   ry+=32;
 
   // ── RIGHT: Tech stack ──
   if(idea.tech_stack?.length){
     ctx.font='bold 11px Inter,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.36)';
-    ctx.fillText('🔧 技术栈',RX,ry); ry+=16;
+    ctx.fillText(L_STACK,RX,ry); ry+=16;
     let tx=RX; ctx.font='bold 11px Inter,sans-serif';
     idea.tech_stack.slice(0,6).forEach(t=>{
       const tw=ctx.measureText(t).width+16;
@@ -829,10 +855,10 @@ function generateShareCard() {
   }
 
   // ── RIGHT: Competitor note ──
-  const comp=extractSection(idea.markdown_prd,'竞品')||extractSection(idea.markdown_prd,'竞争')||'';
+  const comp=extractSection(idea.markdown_prd,'竞品')||extractSection(idea.markdown_prd,'竞争')||extractSection(idea.markdown_prd,'Competitor')||'';
   if(comp && ry < H-80){
     ctx.font='bold 11px Inter,sans-serif'; ctx.fillStyle='rgba(167,139,250,0.85)';
-    ctx.fillText('🏁 竞品分析',RX,ry); ry+=16;
+    ctx.fillText(L_COMP,RX,ry); ry+=16;
     ctx.font='12px Inter,sans-serif'; ctx.fillStyle='rgba(226,232,247,0.55)';
     wrapText(ctx,comp.slice(0,64)+(comp.length>64?'…':''),RX,ry,RW,18);
   }
@@ -842,9 +868,11 @@ function generateShareCard() {
   ctx.beginPath(); ctx.moveTo(24,H-42); ctx.lineTo(W-24,H-42); ctx.stroke();
 
   // ── Footer ──
-  const dateStr=new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'short',day:'numeric'});
+  const locale = isEn ? 'en-US' : 'zh-CN';
+  const dateStr=new Date().toLocaleDateString(locale,{year:'numeric',month:'short',day:'numeric'});
+  const footerText = isEn ? `📡 Generated by BizRadar AI · ${dateStr}` : `📡 BizRadar AI 自动分析生成 · ${dateStr}`;
   ctx.font='10px Inter,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.20)';
-  ctx.textAlign='left'; ctx.fillText(`📡 BizRadar AI 自动分析生成 · ${dateStr}`,32,H-18);
+  ctx.textAlign='left'; ctx.fillText(footerText,32,H-18);
   ctx.textAlign='right'; ctx.fillText('github.com/LomaxWang/ideahunter',W-32,H-18);
 
   document.getElementById('share-card-preview').classList.add('open');
@@ -866,12 +894,13 @@ async function submitScan() {
   const maxItems = parseInt(document.getElementById('scan-max-items').value) || null;
   const kw = document.getElementById('scan-keywords').value.trim();
   const keywords = kw ? kw.split(',').map(s=>s.trim()).filter(Boolean) : null;
+  const language = document.getElementById('scan-language').value || 'zh';
   const btn = document.getElementById('btn-scan');
   btn.disabled = true; btn.textContent = '提交中…';
   try {
     const res = await api('/tasks/scan', {
       method: 'POST',
-      body: JSON.stringify({ source, max_items: maxItems, keywords }),
+      body: JSON.stringify({ source, max_items: maxItems, keywords, language }),
     });
     const tid = res.data?.task_id;
     saveTaskId(tid);  // ✅ 写入 sessionStorage
@@ -888,6 +917,7 @@ async function submitIngest() {
   const source_name = document.getElementById('ingest-source').value.trim() || 'custom';
   const raw = document.getElementById('ingest-content').value.trim();
   const kw = document.getElementById('ingest-keywords').value.trim();
+  const language = document.getElementById('ingest-language').value || 'zh';
   if (!raw) { toast('请输入内容', 'error'); return; }
   const content_list = raw.split('\n').map(s=>s.trim()).filter(Boolean);
   const keywords = kw ? kw.split(',').map(s=>s.trim()).filter(Boolean) : null;
@@ -896,7 +926,7 @@ async function submitIngest() {
   try {
     const res = await api('/webhooks/ingest', {
       method: 'POST',
-      body: JSON.stringify({ source_name, content_list, keywords }),
+      body: JSON.stringify({ source_name, content_list, keywords, language }),
     });
     const tid = res.data?.task_id;
     saveTaskId(tid);  // ✅ 写入 sessionStorage

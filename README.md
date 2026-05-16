@@ -19,7 +19,12 @@
 https://github.com/user-attachments/assets/d2902c9b-7218-4455-b0ed-c7948cf1a003
 
 
+
+
+> 🇺🇸 **[English README](README_EN.md)**
+
 ---
+
 
 > 还在苦恼做不出有真实需求的产品？还在盲目跟随伪需求？
 > **BizRadar** 是一个基于多智能体（Multi-Agent）架构的开源社交媒体痛点挖掘与商业机会评估系统。它能自动监控全网社区，把网友的"无能狂怒"和"心酸吐槽"转化为具有极高商业价值的产品立项书（PRD）！

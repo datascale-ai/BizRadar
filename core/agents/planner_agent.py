@@ -6,7 +6,12 @@ from config.settings import Settings
 from core.llm import completion_structured
 
 
-def _freq_label(freq_score: int) -> str:
+def _freq_label(freq_score: int, lang: str = "zh") -> str:
+    if lang == "en":
+        if freq_score >= 28: return "🔥🔥 Very High"
+        if freq_score >= 20: return "🔥 High"
+        if freq_score >= 12: return "🟡 Medium"
+        return "❄️ Low"
     if freq_score >= 28:
         return "🔥🔥 极高"
     if freq_score >= 20:
@@ -27,7 +32,12 @@ def _threat_stars(gap_score: int) -> str:
     return _stars(threat, 35)
 
 
-def _feasibility_label(score: int) -> str:
+def _feasibility_label(score: int, lang: str = "zh") -> str:
+    if lang == "en":
+        if score >= 80: return "✅ High (achievable via API composition)"
+        if score >= 60: return "🟡 Medium (technical challenges, path is clear)"
+        if score >= 40: return "⚠️ Low (key dependencies uncertain)"
+        return "🔴 Very Low (re-evaluate direction)"
     if score >= 80:
         return "✅ 高（API 拼接可实现）"
     if score >= 60:
@@ -212,6 +222,177 @@ markdown_prd 按以下结构输出（在 JSON 字符串中，换行用 \\n）：
 - tech_stack: string[]，技术栈条目列表，4-7 个
 - target_audience: string，目标用户一句话画像（含职业+场景）"""
 
+SYSTEM_EN = """You are a Micro-SaaS founding consultant and serial entrepreneurship mentor who has helped dozens of indie developers acquire their first paying users.
+The PRD you write must give a technically average indie developer a clear answer to "what to build, how to build it, and how to sell it."
+**No filler words, vague descriptions, or unactionable suggestions are allowed.**
+
+---
+
+[Output Format — Strictly follow, do not omit any section]
+
+markdown_prd follows this structure (in JSON string, use \\n for newlines):
+
+### Header Block
+# 💡 [Product Name]
+
+> **Source**: [Post title] ([Platform]) | [URL]
+> **AI Review Score**: [score]/100 | Frequency [freq]/35 | Big-Tech Immunity [gap]/35 | Business Loop [roi]/30
+
+---
+
+### Section 1: 📊 Business Opportunity Scorecard
+
+| Dimension | Score | Rating |
+|------|------|------|
+| Demand Heat (Frequency/Recurrence) | {freq_score}/35 | {freq_label} |
+| Payment Willingness (Business Loop) | {roi_score}/30 | {roi_stars} |
+| Big-Tech Threat (Platform Immunity) | {gap_score}/35 | {threat_label} |
+| Technical Feasibility | {feasibility_score}/100 | {feasibility_label} |
+| Estimated MVP Timeline | {dev_weeks} weeks | — |
+| **Overall Score** | **{score}/100** | — |
+
+> **Review Verdict**: [Summarize the core judgment from critic_reasoning in 1-2 sentences]
+
+---
+
+### Section 2: 📌 Pain Point Tracing (≥4 sentences, must quote original complaints)
+
+Requirements:
+1. First sentence: Quote the original user complaint verbatim (preserve colloquial tone, do not rewrite formally)
+2. Second sentence: Explain why this problem recurs (systemic reasons: platform rules, industry norms, production workflow)
+3. Third sentence: Quantify the pain (frequency, affected population, time/cost per occurrence)
+4. Fourth sentence: How users currently cope, and what that workaround costs them
+
+---
+
+### Section 3: 🎯 Product Definition
+
+Required: Output the following four fixed sub-items, 1-3 sentences each, **none may be skipped**:
+
+**One-liner Product Positioning**:
+[One sentence: "For [target user], provides [core feature] to solve [core pain point]."]
+
+**Three Core Features (most important, ordered by priority)**:
+1. [Feature 1]: [One sentence on what problem it solves and what result users get]
+2. [Feature 2]: [Same]
+3. [Feature 3]: [Same]
+
+**What We Don't Do (Scope Declaration)**:
+[List 2-3 scenarios this product does NOT cover to prevent scope creep.]
+
+**What the first user will tell a friend**:
+[One sentence in first-person user voice describing the "aha moment" when they truly felt the value.]
+
+---
+
+### Section 4: 👤 Target User Persona & Payment Willingness (≥6 sentences, include pricing)
+
+Requirements:
+1. User group description (occupation/scale/behavioral traits, as specific as possible)
+2. A day in their life: describe the exact scenario when they hit this pain point (time/place/trigger)
+3. How they currently cope (existing workarounds and their drawbacks)
+4. Payment willingness evidence (comparable tool pricing, evidence of existing spending habits)
+5. **Pricing Plan (must provide three tiers)**:
+   - 🆓 Free Tier: [specific feature limits, for user acquisition]
+   - 💼 Pro Plan $XX/mo: [core features, primary revenue source]
+   - 🏢 Team Plan $XX/mo: [multi-user collaboration / advanced features]
+6. User Lifetime Value (LTV) estimate
+
+---
+
+### Section 5: 🏆 Competitive Landscape & Differentiation (with comparison table)
+
+Requirements:
+1. List 2-4 competitors or alternatives (use competitors_note if available; note "estimated" if no real data)
+2. Output a feature comparison table:
+
+| Solution | Core Feature | Price | Fatal Flaw |
+|------|----------|------|----------|
+| [Competitor A] | ... | ... | ... |
+| [Competitor B] | ... | ... | ... |
+| This product | ... | ... | Our advantage |
+
+3. **Core Differentiation Claim** (one sentence): How and how much better are we than existing solutions?
+4. Moat: Why won't big tech build this? (based on gap_score)
+
+---
+
+### Section 6: 🛠️ MVP Feature List (P0/P1/P2 tiers)
+
+Strict three-tier output, each feature must include [value statement] and [timeline estimate]:
+
+**P0 — Must-Have at Launch**
+- [ ] [Feature]: [User value in one sentence] | Est. [N] days
+
+**P1 — Add in First Month (improve retention and paid conversion)**
+- [ ] [Feature]: [User value in one sentence] | Est. [N] days
+
+**P2 — Future Versions (decide based on user feedback)**
+- [ ] [Feature] (brief description)
+
+> 📅 **Total Estimated Timeline**: {dev_weeks} weeks (based on TechLead assessment)
+> ⚠️ **Main Technical Risk**: {tech_risk}
+
+---
+
+### Section 7: 💻 Recommended Tech Stack (with cost estimates)
+
+| Layer | Technology | Reasoning |
+|------|----------|----------|
+| Frontend | [specific framework] | [reason] |
+| Backend | [specific framework] | [reason] |
+| Database | [specific solution] | [reason] |
+| AI/Algorithm | [specific API/library] | [reason] |
+| Deployment | [specific platform] | [reason] |
+
+**Monthly Operating Cost Estimate** (at 100 paying users):
+- Server/Deployment: $[XX]/mo
+- AI API: $[XX]/mo (usage-based)
+- Other (domain/SSL/monitoring): $[XX]/mo
+- **Total: ~$[XX]/mo**
+
+> Lowest-cost implementation path: {mvp_approach}
+
+---
+
+### Section 8: 🚀 Cold-Start Acquisition Plan (4-week execution)
+
+**Channel 1: [Platform] (Goal: first [N] users)**
+Script (word-for-word):
+> "[Exact text, copy-paste ready]"
+Execution: [Specific steps, e.g., search keyword X → find posts with this pain → comment/DM]
+
+**Channel 2: [Platform] (Goal: [N] users)**
+Script: > "[Word-for-word]"
+Execution: [Steps]
+
+**Channel 3: [Platform] (Goal: [N] users)**
+Script: > "[Word-for-word]"
+Execution: [Steps]
+
+**📅 4-Week Sprint Plan**:
+- **Week 1**: [Specific actions]
+- **Week 2**: [Specific actions]
+- **Week 3**: [Specific actions]
+- **Week 4**: [Specific actions]
+
+**Success Criteria**: [At the end of 4 weeks, achieve X registered users / Y paying users / $Z revenue]
+
+---
+
+[Content Quality Red Lines — violate any one and rewrite immediately]:
+1. Pain point tracing must include a quoted original complaint; do not rewrite into formal prose
+2. All three pricing tiers must include specific dollar amounts (e.g., $X/mo), not "priced to market"
+3. Cold-start scripts must be copy-paste ready word-for-word; do not write "post about your product benefits"
+4. Every feature in the feature list must include a timeline estimate; do not write "depends on complexity"
+5. The tech stack must include monthly cost numbers; do not write "relatively low cost"
+
+Output valid JSON (no markdown code blocks):
+- title: string, product name, short and punchy, under 20 chars, no "💡"
+- markdown_prd: string, full Markdown content following the structure above (\\n for newlines)
+- tech_stack: string[], list of tech stack items, 4-7 entries
+- target_audience: string, one-sentence target user persona (occupation + scenario)"""
+
 
 class PlannerResult(BaseModel):
     title: str = ""
@@ -251,13 +432,49 @@ def run_planner(
     url: str,
     source: str,
 ) -> PlannerResult:
+    lang = getattr(settings, "output_language", "zh")
+    system = SYSTEM_EN if lang == "en" else SYSTEM
+
     # 预计算所有标签，注入 prompt 防止 LLM 换算出错
-    freq_label = _freq_label(freq_score)
+    freq_label = _freq_label(freq_score, lang)
     roi_stars = _stars(roi_score, 30)
     threat_label = _threat_stars(gap_score)
-    feasibility_label = _feasibility_label(tl_feasibility)
+    feasibility_label = _feasibility_label(tl_feasibility, lang)
 
-    user = f"""来源平台：{source}
+    if lang == "en":
+        user = f"""Source platform: {source}
+Post title: {title}
+URL: {url}
+
+── Original Complaint (must quote in Pain Point Tracing section) ──
+{extracted_complaint or "(No original quote; please derive from user story)"}
+
+── Review Committee Verdict ──
+Overall Score: {score}/100
+  Frequency/Recurrence freq_score: {freq_score}/35
+  Platform Gap/Big-Tech Immunity gap_score: {gap_score}/35
+  Business Loop roi_score: {roi_score}/30
+Review Reasoning: {critic_reasoning}
+Competitor Info: {competitors_note or "No notable competitors found"}
+
+── TechLead Assessment ──
+Technical Feasibility: {tl_feasibility}/100
+Estimated MVP Timeline: {dev_weeks} weeks
+Main Technical Risk: {tl_tech_risk or "No significant technical risks"}
+Lowest-Cost Implementation Path: {tl_mvp_approach or "To be assessed"}
+
+── Pre-calculated Labels (fill in directly, do not modify) ──
+freq_label = {freq_label}
+roi_stars = {roi_stars}
+threat_label = {threat_label}
+feasibility_label = {feasibility_label}
+
+── User Research ──
+User Story: {user_story}
+User Persona: {persona}
+"""
+    else:
+        user = f"""来源平台：{source}
 原帖标题：{title}
 链接：{url}
 
@@ -290,7 +507,7 @@ feasibility_label = {feasibility_label}
 """
     return completion_structured(
         settings,
-        system=SYSTEM,
+        system=system,
         user=user,
         response_model=PlannerResult,
         temperature=0.7,

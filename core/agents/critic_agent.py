@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from config.settings import Settings
 from core.llm import completion_structured
 
-SYSTEM = """你是毒舌投资人 + 技术合伙人，对痛点商业价值做严格评审。
+SYSTEM_ZH = """你是毒舌投资人 + 技术合伙人，对痛点商业价值做严格评审。
 请按「黄金三定律」打分，**三项子分之和 = score 总分**：
 
 1. 高频重复性 freq_score（0-35分）：日常是否反复发生？大量手工/重复劳动？
@@ -45,6 +45,46 @@ SYSTEM = """你是毒舌投资人 + 技术合伙人，对痛点商业价值做�
 - roi_score: number，0-30 整数
 - reasoning: string，中文理由，须说明三项各得多少分及原因
 - competitors_note: string，基于搜索结果的竞品判断，无真实搜索则写推测"""
+
+SYSTEM_EN = """You are a ruthless investor + technical co-founder conducting strict business value reviews of pain points.
+Score based on the "Golden Three Laws" — the sum of the three sub-scores must equal the total score:
+
+1. High-Frequency Recurrence freq_score (0-35): Does this happen repeatedly every day? Involves lots of manual or repetitive work?
+   - 35: Happens daily, unbearable | 10: Occasional, tolerable
+2. Platform Gap / Big-Tech Immunity gap_score (0-35): Is this inconvenient or unlikely for big tech to address?
+   - 35: Structurally impossible for big tech due to platform fragmentation or scale | 10: Big tech can copy at any time
+3. Business Loop roi_score (0-30): Are users willing to pay? Is the monetization path clear?
+   - 30: Users clearly willing to pay, few competitors | 5: Free alternatives already exist
+
+[Competitor Reference]:
+- If real competitor search results are provided, prioritize them to judge competitor maturity and directly influence roi_score
+- If competitors are mature (Notion/Trello/Jira level), force roi_score ≤10, push total score below 40
+- If search results show scarce or weak competitors, you may increase roi_score
+
+[Technical Feasibility Reference]:
+- If a technical assessment is provided, reference its feasibility_score and dev_weeks
+- feasibility_score < 50: very high technical barrier or platform violation risk; force freq_score down by 10
+- dev_weeks > 12: hard for indie devs to validate quickly; reduce gap_score by 5 as appropriate
+
+[Scoring Calibration Anchors]:
+- 90+: Explosive demand, big-tech vacuum, extreme user pain, strong payment intent
+- 75-89: Clear pain point, market room, but some competitors or lower frequency
+- 55-74: Real pain but limited scale, or competition already notable
+- 35-54: Users complain but free alternatives exist, monetization unclear
+- 0-34: No commercial value, or mature solutions already exist
+
+[Strict Requirements]:
+- freq_score + gap_score + roi_score must strictly equal score
+- Do not cluster most projects in the 70-80 range; scores above 85 require specific justification in reasoning
+- Do not give "safe" scores like 72/78; force yourself to make a judgment
+
+Output valid JSON (no markdown code blocks):
+- score: integer 0-100 (= freq_score + gap_score + roi_score)
+- freq_score: integer 0-35
+- gap_score: integer 0-35
+- roi_score: integer 0-30
+- reasoning: string, reasoning in English explaining each sub-score
+- competitors_note: string, competitor judgment based on search results, or inference if no real search"""
 
 
 class CriticResult(BaseModel):
@@ -87,20 +127,32 @@ def run_critic(
     title: str,
     url: str,
     summary: str = "",
-    competitor_context: str = "",   # 真实竞品搜索结果（可选）
-    tech_context: str = "",         # Tech Lead 技术评估（可选）
+    competitor_context: str = "",
+    tech_context: str = "",
 ) -> CriticResult:
-    comp_section = (
-        f"\n\n{competitor_context}"
-        if competitor_context
-        else "\n\n【竞品搜索】：未执行（SERPER_API_KEY 未配置），请凭已有知识推测。"
-    )
-    tech_section = (
-        f"\n\n{tech_context}"
-        if tech_context
-        else ""
-    )
-    user = f"""原帖标题：{title}
+    lang = getattr(settings, "output_language", "zh")
+    system = SYSTEM_EN if lang == "en" else SYSTEM_ZH
+    if lang == "en":
+        comp_section = (
+            f"\n\n{competitor_context}"
+            if competitor_context
+            else "\n\n[Competitor Search]: Not executed (SERPER_API_KEY not configured). Please infer from existing knowledge."
+        )
+        tech_section = f"\n\n{tech_context}" if tech_context else ""
+        user = f"""Post title: {title}
+URL: {url}
+Pain point summary: {summary}
+User story: {user_story}
+User persona: {persona}{comp_section}{tech_section}
+"""
+    else:
+        comp_section = (
+            f"\n\n{competitor_context}"
+            if competitor_context
+            else "\n\n【竞品搜索】：未执行（SERPER_API_KEY 未配置），请凭已有知识推测。"
+        )
+        tech_section = f"\n\n{tech_context}" if tech_context else ""
+        user = f"""原帖标题：{title}
 链接：{url}
 痛点摘要（一句话核心）：{summary}
 用户故事：{user_story}
@@ -108,7 +160,7 @@ def run_critic(
 """
     return completion_structured(
         settings,
-        system=SYSTEM,
+        system=system,
         user=user,
         response_model=CriticResult,
         temperature=0.5,

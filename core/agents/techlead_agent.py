@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 from config.settings import Settings
 from core.llm import completion_structured
 
-SYSTEM = """你是一个务实的技术合伙人（独立开发者 CTO 视角）。
+SYSTEM_ZH = """你是一个务实的技术合伙人（独立开发者 CTO 视角）。
 基于给定的用户痛点和初步用户故事，评估以 1-2 人独立开发团队实现 MVP 的技术可行性。
 
 【评估维度】：
@@ -45,6 +45,39 @@ SYSTEM = """你是一个务实的技术合伙人（独立开发者 CTO 视角）
 - tech_risk: string，最关键技术风险一句话
 - mvp_approach: string，最低成本实现路径"""
 
+SYSTEM_EN = """You are a pragmatic technical co-founder (indie developer CTO perspective).
+Based on the given pain point and initial user story, assess the technical feasibility of building an MVP with a 1-2 person indie team.
+
+[Assessment Dimensions]:
+
+1. dev_weeks (integer work weeks):
+   - 1-2 weeks: Pure frontend / simple scripts, no complex backend
+   - 3-6 weeks: Standard CRUD + third-party API integration
+   - 7-12 weeks: Complex integrations, multi-platform adaptation, scraping or special APIs
+   - 12+ weeks: Model training, large-scale data engineering, or complex hardware
+
+2. feasibility_score (integer 0-100):
+   - 90+: Fully achievable by composing existing APIs/SDKs, zero technical barrier
+   - 70-89: Standard dev stack, 1-2 technical challenges but path is clear
+   - 50-69: Key dependencies have uncertainty (e.g., reverse-engineering closed APIs, heavy anti-scraping)
+   - 30-49: Major dependencies are unstable (rate limits, high platform policy risk)
+   - 0-29: Nearly infeasible (requires training a base LLM, serious ToS violations, hardware required)
+
+3. tech_risk: One sentence describing the most critical obstacle (focus on "can't build" or "will get banned")
+
+4. mvp_approach: 1-2 sentences, the lowest-cost, fastest validation implementation path
+
+[Key Principles]:
+- Strictly distinguish "hard to build" from "impossible to build"
+- WeChat internal APIs, Apple Review, TikTok anti-scraping are high-risk — flag them explicitly
+- Prefer API composition over custom development to reduce estimation errors
+
+Output valid JSON (no markdown code blocks):
+- dev_weeks: number, positive integer
+- feasibility_score: number, integer 0-100
+- tech_risk: string, one sentence on the most critical technical risk
+- mvp_approach: string, lowest-cost implementation path"""
+
 
 class TechLeadResult(BaseModel):
     dev_weeks: int = Field(default=4, ge=1)
@@ -69,14 +102,23 @@ def run_techlead(
     persona: str,
     summary: str = "",
 ) -> TechLeadResult:
-    user = f"""原帖标题：{title}
+    lang = getattr(settings, "output_language", "zh")
+    system = SYSTEM_EN if lang == "en" else SYSTEM_ZH
+    if lang == "en":
+        user = f"""Post title: {title}
+Pain point summary: {summary}
+User story: {user_story}
+User persona: {persona}
+"""
+    else:
+        user = f"""原帖标题：{title}
 痛点摘要：{summary}
 用户故事：{user_story}
 用户画像：{persona}
 """
     return completion_structured(
         settings,
-        system=SYSTEM,
+        system=system,
         user=user,
         response_model=TechLeadResult,
         temperature=0.3,

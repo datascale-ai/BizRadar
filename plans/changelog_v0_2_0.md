@@ -4,6 +4,18 @@
 
 ---
 
+## 🌍 国际化：中英文双语模式支持 (最新)
+
+*   **背景**：为了将 BizRadar 推广到全球市场与海外开发者社区（如 Hacker News, Reddit），需要系统支持纯正的英文分析与报告输出。
+*   **核心改进**：
+    *   **全局配置**：`config/settings.py` 和 `.env.example` 新增 `output_language` ("zh" 或 "en") 配置项。
+    *   **Agent 双语 Prompt 架构**：重构了所有 5 个核心 Agent（`Extractor`, `PM`, `TechLead`, `Critic`, `Planner`），为每个 Agent 剥离并内置了 `SYSTEM_ZH` 和 `SYSTEM_EN` 双语系统指令，根据请求动态切换。
+    *   **请求级语言隔离**：重构了后端 API 的 `ScanBody` 和 `IngestBody` 模型，接受 `language` 参数。API 路由动态克隆并覆盖 `Settings`，确保并发运行不同语言任务时互不干扰。
+    *   **UI 与分享卡片全面本地化**：
+        *   Web 界面任务表单新增「输出语言」切换控件。
+        *   Canvas 分享卡片渲染引擎增加智能探测机制，在英文模式下自动将所有固定标签（如“核心痛点”、“商业评分”）和页脚日期声明切换为英文（如 "Core Pain Point", "Business Score"）。
+
+---
 ## 📄 Planner Agent 深度升级 — 立项书完整度提升 (最新)
 
 *   **背景**：原版立项书各章节内容过于简单，靠 LLM 自由发挥产出废话（如"可以在社交媒体宣传"），与 RFC 和 Intro 中展示的完整立项书示例相差甚远。
